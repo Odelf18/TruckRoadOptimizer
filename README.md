@@ -4,14 +4,16 @@ A powerful Streamlit application that optimizes tire pickup routes using multipl
 
 ## ✨ Features
 
-- **🚛 Multi-vehicle optimization** - Supports 1-3 vehicles with smart allocation
-- **📦 Capacity constraints** - Configurable tire capacity per vehicle (default: 300 tires)
-- **⏰ Working hours** - Respects vehicle availability and time constraints
-- **🗺️ Real routes** - Uses Google Maps API for accurate distances and directions
-- **🧪 Async testing** - Parallel testing of different vehicle configurations
-- **🎲 Mock data** - Built-in test data generator using Houston area addresses
-- **📊 Interactive maps** - Visual route display with Folium
-- **⚡ Fast optimization** - OR-Tools constraint solver for efficient solutions
+- **🚛 Smart Multi-vehicle Optimization** - Intelligent redistribution between 1-3 vehicles
+- **⏰ Strict Time Constraints** - Each vehicle respects individual working hours (600 min default)
+- **🔄 Intelligent Redistribution** - Automatically redistributes tasks when vehicles exceed time limits
+- **📦 Capacity Constraints** - Configurable tire capacity per vehicle (default: 300 tires)
+- **🗺️ Real Routes** - Google Maps API integration for accurate distances and directions
+- **🧪 Parallel Testing** - Async testing of 1, 2, 3 vehicle configurations simultaneously
+- **🎲 Mock Data Generator** - Built-in test data with 44 Houston area addresses
+- **📊 Interactive Maps** - Visual route display with Folium and detailed route visualization
+- **⚡ OR-Tools Optimization** - Advanced constraint solver with time and capacity dimensions
+- **🎯 Decision Analysis** - Detailed explanation of why specific vehicle counts were chosen
 
 ## 🚀 Quick Start
 
@@ -94,13 +96,15 @@ The application includes 44 Houston-area addresses in `addresses.json` for testi
 
 #### Standard Optimization
 - Tests vehicles sequentially (1, then 2, then 3)
-- Uses Google Maps for accurate distances
-- Detailed route visualization
+- Uses Google Maps for accurate distances and real routes
+- Detailed route visualization with interactive maps
+- Comprehensive decision analysis and explanations
 
 #### Async Testing
-- Tests all vehicle configurations in parallel
-- Faster execution with simplified distance calculations
+- Tests all vehicle configurations in parallel (1, 2, 3 vehicles simultaneously)
+- Faster execution with optimized distance calculations
 - Quick comparison of different solutions
+- Individual vehicle time analysis and constraint validation
 
 ## 🏗️ Architecture
 
@@ -120,12 +124,24 @@ The application includes 44 Houston-area addresses in `addresses.json` for testi
 
 ### Optimization Algorithm
 
-1. **Geocoding** - Convert addresses to coordinates
-2. **Distance Matrix** - Calculate travel times between all points
-3. **Constraint Setup** - Define vehicle capacity and time constraints
-4. **Route Optimization** - Use OR-Tools to find optimal routes
-5. **Solution Validation** - Check if routes fit within working hours
-6. **Visualization** - Display results on interactive map
+1. **Geocoding** - Convert addresses to coordinates using Google Maps API
+2. **Distance Matrix** - Calculate travel times between all points with batching
+3. **Constraint Setup** - Define vehicle capacity and strict time constraints
+4. **Smart Redistribution** - OR-Tools automatically redistributes tasks when vehicles exceed time limits
+5. **Route Optimization** - Advanced constraint solver with time and capacity dimensions
+6. **Solution Validation** - Each vehicle must respect individual working hours
+7. **Decision Analysis** - Detailed explanation of vehicle allocation choices
+8. **Visualization** - Interactive maps with detailed route visualization
+
+### Intelligent Redistribution Logic
+
+The application uses advanced constraint programming to ensure optimal task distribution:
+
+- **1 Vehicle**: Attempts to complete all tasks, fails if > 600 minutes
+- **2 Vehicles**: Automatically redistributes tasks to respect time constraints
+- **3 Vehicles**: Uses all vehicles if 2 vehicles cannot complete within time limits
+- **Time Constraints**: Each vehicle has individual 600-minute working hours
+- **Capacity Constraints**: Each vehicle respects tire capacity limits
 
 ## 📊 Results Analysis
 
@@ -184,6 +200,28 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - **Streamlit** - For the web application framework
 - **Folium** - For interactive map visualization
 
+## 🚀 Deployment
+
+### Streamlit Cloud (Recommended)
+1. Push code to GitHub repository
+2. Go to [share.streamlit.io](https://share.streamlit.io)
+3. Connect GitHub and select repository
+4. Configure environment variables: `GOOGLE_API_KEY`
+5. Deploy with one click!
+
+### Heroku
+1. Install Heroku CLI
+2. Deploy: `heroku create your-app-name`
+3. Set environment variables: `heroku config:set GOOGLE_API_KEY=your_key`
+
+### Local Development
+```bash
+git clone https://github.com/Odelf18/TruckRoadOptimizer.git
+cd TruckRoadOptimizer
+pip install -r requirements.txt
+streamlit run app.py
+```
+
 ## 📞 Support
 
 For issues and questions:
@@ -195,3 +233,5 @@ For issues and questions:
 ---
 
 **Happy optimizing! 🚚✨**
+
+*Built with ❤️ using Streamlit, Google Maps API, and OR-Tools*
