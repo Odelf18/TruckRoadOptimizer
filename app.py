@@ -605,9 +605,9 @@ if test_async_clicked and stops:
         def test_vehicle_count(num_vehicles):
             try:
                 manager = pywrapcp.RoutingIndexManager(n_points, num_vehicles, 0)
-    routing = pywrapcp.RoutingModel(manager)
+                routing = pywrapcp.RoutingModel(manager)
 
-    def distance_callback(from_index, to_index):
+                def distance_callback(from_index, to_index):
                     from_node = manager.IndexToNode(from_index)
                     to_node = manager.IndexToNode(to_index)
                     distance = dist_matrix[from_node][to_node]
@@ -621,8 +621,8 @@ if test_async_clicked and stops:
                         
                     return int(distance * 1000)
 
-    transit_cb = routing.RegisterTransitCallback(distance_callback)
-    routing.SetArcCostEvaluatorOfAllVehicles(transit_cb)
+                transit_cb = routing.RegisterTransitCallback(distance_callback)
+                routing.SetArcCostEvaluatorOfAllVehicles(transit_cb)
 
                 # Add capacity constraints
                 def demand_callback(from_index):
@@ -643,8 +643,8 @@ if test_async_clicked and stops:
                 
                 # Ajouter les mêmes contraintes de temps que l'optimisation principale
                 def time_callback(from_index, to_index):
-                    from_node = simple_manager.IndexToNode(from_index)
-                    to_node = simple_manager.IndexToNode(to_index)
+                    from_node = manager.IndexToNode(from_index)
+                    to_node = manager.IndexToNode(to_index)
                     travel_time = dist_matrix[from_node][to_node]
                     
                     if to_node != 0:  # Pas le dépôt
@@ -652,8 +652,8 @@ if test_async_clicked and stops:
                         return int((travel_time + loading_time) * 1000)
                     return int(travel_time * 1000)
                 
-                time_cb = simple_routing.RegisterTransitCallback(time_callback)
-                simple_routing.AddDimension(
+                time_cb = routing.RegisterTransitCallback(time_callback)
+                routing.AddDimension(
                     time_cb,
                     work_duration_minutes * 1000,
                     work_duration_minutes * 1000,
@@ -662,15 +662,15 @@ if test_async_clicked and stops:
                 )
                 
                 # Contrainte : chaque véhicule doit respecter les heures de travail
-                time_dimension = simple_routing.GetDimensionOrDie('Time')
+                time_dimension = routing.GetDimensionOrDie('Time')
                 for vehicle_id in range(num_vehicles):
-                    time_dimension.CumulVar(simple_routing.End(vehicle_id)).SetMax(work_duration_minutes * 1000)
+                    time_dimension.CumulVar(routing.End(vehicle_id)).SetMax(work_duration_minutes * 1000)
 
                 search_params = pywrapcp.DefaultRoutingSearchParameters()
                 search_params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
                 search_params.time_limit.FromSeconds(10)
 
-                solution = simple_routing.SolveWithParameters(search_params)
+                solution = routing.SolveWithParameters(search_params)
 
                 if solution:
                     # Calculate solution metrics
@@ -678,20 +678,20 @@ if test_async_clicked and stops:
                     vehicle_routes = []
                     
                     for vehicle_id in range(num_vehicles):
-                        index = simple_routing.Start(vehicle_id)
+                        index = routing.Start(vehicle_id)
                         route = []
                         
                         # Utiliser la dimension Time pour obtenir le temps exact
-                        time_dimension = simple_routing.GetDimensionOrDie('Time')
-                        vehicle_time = solution.Value(time_dimension.CumulVar(simple_routing.End(vehicle_id))) / 1000.0
+                        time_dimension = routing.GetDimensionOrDie('Time')
+                        vehicle_time = solution.Value(time_dimension.CumulVar(routing.End(vehicle_id))) / 1000.0
                         
-                        while not simple_routing.IsEnd(index):
-                            node = simple_manager.IndexToNode(index)
+                        while not routing.IsEnd(index):
+                            node = manager.IndexToNode(index)
                             route.append(node)
-                            next_index = solution.Value(simple_routing.NextVar(index))
+                            next_index = solution.Value(routing.NextVar(index))
                             index = next_index
                         
-                        route.append(simple_manager.IndexToNode(index))
+                        route.append(manager.IndexToNode(index))
                         vehicle_times.append(vehicle_time)
                         vehicle_routes.append(route)
                     
