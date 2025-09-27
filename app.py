@@ -393,17 +393,40 @@ if optimize_clicked and stops:
                         True,  # start cumul to zero
                         'Capacity'
                     )
-
-                    # Try without time constraints first to isolate the problem
-                    # We'll add time constraints later once basic routing works
-
+                    
+                    # Ajouter des contraintes de temps pour forcer la redistribution
+                    def time_callback(from_index, to_index):
+                        from_node = manager.IndexToNode(from_index)
+                        to_node = manager.IndexToNode(to_index)
+                        travel_time = dist_matrix[from_node][to_node]
+                        
+                        # Ajouter le temps de chargement si on va vers un arrêt
+                        if to_node != 0:  # Pas le dépôt
+                            loading_time = base_loading_time + (stops[to_node-1]['qty'] * tire_loading_time)
+                            return int((travel_time + loading_time) * 1000)
+                        return int(travel_time * 1000)
+                    
+                    time_cb = routing.RegisterTransitCallback(time_callback)
+                    routing.AddDimension(
+                        time_cb,
+                        work_duration_minutes * 1000,  # Slack maximum (600 min)
+                        work_duration_minutes * 1000,  # Capacité maximale (600 min)
+                        False,  # start cumul to zero
+                        'Time'
+                    )
+                    
+                    # Contrainte : chaque véhicule doit respecter les heures de travail
+                    time_dimension = routing.GetDimensionOrDie('Time')
+                    for vehicle_id in range(num_vehicles):
+                        time_dimension.CumulVar(routing.End(vehicle_id)).SetMax(work_duration_minutes * 1000)
+                    
                     # Silent constraint validation
                     total_tires = sum(s['qty'] for s in stops)
                     
                     search_params = pywrapcp.DefaultRoutingSearchParameters()
                     search_params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
                     search_params.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
-                    search_params.time_limit.FromSeconds(30)
+                    search_params.time_limit.FromSeconds(60)
 
                     # Silent matrix validation and fixing
                     for i in range(n_points):
@@ -423,22 +446,15 @@ if optimize_clicked and stops:
                             for vehicle_id in range(num_vehicles):
                                 index = routing.Start(vehicle_id)
                                 route = []
-                                vehicle_time = 0
+                                
+                                # Utiliser la dimension Time pour obtenir le temps exact
+                                time_dimension = routing.GetDimensionOrDie('Time')
+                                vehicle_time = solution.Value(time_dimension.CumulVar(routing.End(vehicle_id))) / 1000.0
                                 
                                 while not routing.IsEnd(index):
                                     node = manager.IndexToNode(index)
                                     route.append(node)
                                     next_index = solution.Value(routing.NextVar(index))
-                                    next_node = manager.IndexToNode(next_index)
-                                    
-                                    # Add travel time
-                                    vehicle_time += dist_matrix[node][next_node]
-                                    
-                                    # Add loading time at destination
-                                    if next_node != 0:  # Not depot
-                                        tire_qty = stops[next_node-1]['qty']
-                                        vehicle_time += base_loading_time + (tire_qty * tire_loading_time)
-                                    
                                     index = next_index
                                 
                                 route.append(manager.IndexToNode(index))  # Add end depot
@@ -589,9 +605,9 @@ if test_async_clicked and stops:
         def test_vehicle_count(num_vehicles):
             try:
                 manager = pywrapcp.RoutingIndexManager(n_points, num_vehicles, 0)
-                routing = pywrapcp.RoutingModel(manager)
+    routing = pywrapcp.RoutingModel(manager)
 
-                def distance_callback(from_index, to_index):
+    def distance_callback(from_index, to_index):
                     from_node = manager.IndexToNode(from_index)
                     to_node = manager.IndexToNode(to_index)
                     distance = dist_matrix[from_node][to_node]
@@ -605,8 +621,8 @@ if test_async_clicked and stops:
                         
                     return int(distance * 1000)
 
-                transit_cb = routing.RegisterTransitCallback(distance_callback)
-                routing.SetArcCostEvaluatorOfAllVehicles(transit_cb)
+    transit_cb = routing.RegisterTransitCallback(distance_callback)
+    routing.SetArcCostEvaluatorOfAllVehicles(transit_cb)
 
                 # Add capacity constraints
                 def demand_callback(from_index):
@@ -624,38 +640,58 @@ if test_async_clicked and stops:
                     True,
                     'Capacity'
                 )
+                
+                # Ajouter les mêmes contraintes de temps que l'optimisation principale
+                def time_callback(from_index, to_index):
+                    from_node = simple_manager.IndexToNode(from_index)
+                    to_node = simple_manager.IndexToNode(to_index)
+                    travel_time = dist_matrix[from_node][to_node]
+                    
+                    if to_node != 0:  # Pas le dépôt
+                        loading_time = base_loading_time + (stops[to_node-1]['qty'] * tire_loading_time)
+                        return int((travel_time + loading_time) * 1000)
+                    return int(travel_time * 1000)
+                
+                time_cb = simple_routing.RegisterTransitCallback(time_callback)
+                simple_routing.AddDimension(
+                    time_cb,
+                    work_duration_minutes * 1000,
+                    work_duration_minutes * 1000,
+                    False,
+                    'Time'
+                )
+                
+                # Contrainte : chaque véhicule doit respecter les heures de travail
+                time_dimension = simple_routing.GetDimensionOrDie('Time')
+                for vehicle_id in range(num_vehicles):
+                    time_dimension.CumulVar(simple_routing.End(vehicle_id)).SetMax(work_duration_minutes * 1000)
 
                 search_params = pywrapcp.DefaultRoutingSearchParameters()
                 search_params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
                 search_params.time_limit.FromSeconds(10)
 
-                solution = routing.SolveWithParameters(search_params)
-                
+                solution = simple_routing.SolveWithParameters(search_params)
+
                 if solution:
                     # Calculate solution metrics
                     vehicle_times = []
                     vehicle_routes = []
                     
                     for vehicle_id in range(num_vehicles):
-                        index = routing.Start(vehicle_id)
+                        index = simple_routing.Start(vehicle_id)
                         route = []
-                        vehicle_time = 0
                         
-                        while not routing.IsEnd(index):
-                            node = manager.IndexToNode(index)
+                        # Utiliser la dimension Time pour obtenir le temps exact
+                        time_dimension = simple_routing.GetDimensionOrDie('Time')
+                        vehicle_time = solution.Value(time_dimension.CumulVar(simple_routing.End(vehicle_id))) / 1000.0
+                        
+                        while not simple_routing.IsEnd(index):
+                            node = simple_manager.IndexToNode(index)
                             route.append(node)
-                            next_index = solution.Value(routing.NextVar(index))
-                            next_node = manager.IndexToNode(next_index)
-                            
-                            vehicle_time += dist_matrix[node][next_node]
-                            
-                            if next_node != 0:  # Not depot
-                                tire_qty = stops[next_node-1]['qty']
-                                vehicle_time += base_loading_time + (tire_qty * tire_loading_time)
-                            
+                            next_index = solution.Value(simple_routing.NextVar(index))
                             index = next_index
                         
-                        route.append(manager.IndexToNode(index))
+                        route.append(simple_manager.IndexToNode(index))
                         vehicle_times.append(vehicle_time)
                         vehicle_routes.append(route)
                     
@@ -948,7 +984,7 @@ if st.session_state.results and st.session_state.optimization_done:
                     popup=f"🚛 Vehicle {vehicle_id + 1}<br>📍 Stop {i}<br>{s['address']}<br>📦 {s['qty']} tires<br>⏱️ {loading_time:.1f} min loading",
                     icon=folium.Icon(color=color, icon="truck", prefix="fa")
                 ).add_to(m)
-        
+
         # Route line for this vehicle - use detailed Google Maps routes
         if len(route) > 1:
             # Get detailed route for this vehicle
@@ -1003,7 +1039,7 @@ if st.session_state.results and st.session_state.optimization_done:
                     opacity=0.8,
                     popup=f"Vehicle {vehicle_id + 1} Route (Straight line)"
                 ).add_to(m)
-    
+
     st_folium(m, width=900, height=600)
 
 # Help section
